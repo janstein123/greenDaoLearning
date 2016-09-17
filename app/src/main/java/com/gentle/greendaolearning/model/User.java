@@ -20,12 +20,16 @@ public class User {
     String email;
     boolean isOnline;
 
-    @Generated(hash = 1827978935)
-    public User(long uid, @NotNull String name, String email, boolean isOnline) {
+    long homeId;
+
+    @Generated(hash = 2051188818)
+    public User(long uid, @NotNull String name, String email, boolean isOnline,
+            long homeId) {
         this.uid = uid;
         this.name = name;
         this.email = email;
         this.isOnline = isOnline;
+        this.homeId = homeId;
     }
 
     @Generated(hash = 586692638)
@@ -67,6 +71,14 @@ public class User {
 
     public void setIsOnline(boolean isOnline) {
         this.isOnline = isOnline;
+    }
+
+    public long getHomeId() {
+        return this.homeId;
+    }
+
+    public void setHomeId(long homeId) {
+        this.homeId = homeId;
     }
 
 }
