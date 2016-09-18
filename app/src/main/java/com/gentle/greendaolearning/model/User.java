@@ -22,6 +22,13 @@ public class User {
 
     long homeId;
 
+    public User(long uid, String name, String email, boolean isOnline) {
+        this.uid = uid;
+        this.name = name;
+        this.email = email;
+        this.isOnline = isOnline;
+    }
+
     @Generated(hash = 2051188818)
     public User(long uid, @NotNull String name, String email, boolean isOnline,
             long homeId) {

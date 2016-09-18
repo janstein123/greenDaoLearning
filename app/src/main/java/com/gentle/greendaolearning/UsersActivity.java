@@ -23,6 +23,8 @@ import com.gentle.greendaolearning.model.HomeDao;
 import com.gentle.greendaolearning.model.User;
 import com.gentle.greendaolearning.model.UserDao;
 
+import org.greenrobot.greendao.query.DeleteQuery;
+
 import java.util.List;
 import java.util.Random;
 
@@ -73,7 +75,6 @@ public class UsersActivity extends AppCompatActivity implements AdapterView.OnIt
         return super.onPrepareOptionsMenu(menu);
     }
 
-    int homeId = 1000;
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
@@ -87,35 +88,53 @@ public class UsersActivity extends AppCompatActivity implements AdapterView.OnIt
             Random random = new Random(100);
             boolean isOnline = random.nextBoolean();
 
-            User user = new User(i, name, email, isOnline, homeId);
-            mUserDao.insert(user);
-
-            for (Home home: mHomes){
-                home.resetUsers();
+            /*
+            * if home list is not empty, create a user and add it to the last home in home list.
+            * if no home is created, create a user independently.
+            *
+            * */
+            long homeId = 0;
+            if (mHomes.size() > 0){
+                homeId = mHomes.get(mHomes.size() - 1).getHid();
             }
-            
+
+            User user;
+            if(homeId > 0) {
+                user = new User(i, name, email, isOnline, homeId);
+            }else{
+                user = new User(i, name, email, isOnline);
+            }
+
+            mUserDao.insert(user);
+            Toast.makeText(UsersActivity.this, "Add user successfully.", Toast.LENGTH_SHORT).show();
             mUsers = mUserDao.loadAll();
 
-            mHomes = mHomeDao.loadAll();
+            Home home = mHomeDao.load(homeId);
+            if(home != null){
+                home.resetUsers();
+            }
+
             mUserAdapter.notifyDataSetChanged();
             mHomeAdapter.notifyDataSetChanged();
             return true;
         }else if(id == R.id.action_add_home){
             Log.d(TAG, "add home");
-            long i = System.currentTimeMillis();
-            String name = "user"+i;
+            long homeId = System.currentTimeMillis();
+            //make home id and user id different
+            long userId = homeId + 1;
+            String name = "user"+userId;
             String email = name+"@tcl.com";
 
             Random random = new Random(100);
             boolean isOnline = random.nextBoolean();
-
-            User user = new User(i, name, email, isOnline, homeId);
+            //owner user can not be null when create home.
+            User user = new User(userId, name, email, isOnline, homeId);
             mUserDao.insert(user);
 
             String homeName = "home"+homeId;
             Home home = new Home(homeId, homeName, user.getUid());
             mHomeDao.insert(home);
-            Toast.makeText(UsersActivity.this, "Add successfully.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(UsersActivity.this, "Add home successfully.", Toast.LENGTH_SHORT).show();
             mUsers = mUserDao.loadAll();
             mHomes = mHomeDao.loadAll();
             mUserAdapter.notifyDataSetChanged();
@@ -132,52 +151,67 @@ public class UsersActivity extends AppCompatActivity implements AdapterView.OnIt
             Toast.makeText(UsersActivity.this, "Delete successfully.", Toast.LENGTH_SHORT).show();
             mUsers = mUserDao.loadAll();
             mUserAdapter.notifyDataSetChanged();
+
+            Home home = mHomeDao.load(user.getHomeId());
+            if(home != null){
+                home.resetUsers();
+            }
+
+            mHomeAdapter.notifyDataSetChanged();
+
         }else if(parent.getId() == R.id.home_list){
             Home home = (Home) mHomeAdapter.getItem(position);
             mHomeDao.delete(home);
+            DeleteQuery deleteQuery = mUserDao.queryBuilder().where(UserDao.Properties.HomeId.eq(home.getHid())).buildDelete();
+            deleteQuery.executeDeleteWithoutDetachingEntities();
             Toast.makeText(UsersActivity.this, "Delete successfully.", Toast.LENGTH_SHORT).show();
             mHomes = mHomeDao.loadAll();
             mHomeAdapter.notifyDataSetChanged();
+
+            mUsers = mUserDao.loadAll();
+            mUserAdapter.notifyDataSetChanged();
         }
     }
 
     @Override
     public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-        final User user = (User) mUserAdapter.getItem(position);
-        LayoutInflater inflater = LayoutInflater.from(this);
-        View v = inflater.inflate(R.layout.dialog_rename_user, null);
-        final EditText nameEdit = (EditText) v.findViewById(R.id.name_edit);
-        nameEdit.setText(user.getName());
-        nameEdit.setSelection(user.getName().length());
+        if(parent.getId() == R.id.user_list) {
+            final User user = (User) mUserAdapter.getItem(position);
+            LayoutInflater inflater = LayoutInflater.from(this);
+            View v = inflater.inflate(R.layout.dialog_rename_user, null);
+            final EditText nameEdit = (EditText) v.findViewById(R.id.name_edit);
+            nameEdit.setText(user.getName());
+            nameEdit.setSelection(user.getName().length());
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setView(v);
-        builder.setTitle("Rename User");
-        builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                String name = nameEdit.getText().toString().trim();
-                if(name != null && !name.isEmpty() && !name.equals(user.getName())){
-                    user.setName(name);
-                    mUserDao.update(user);
-                    Toast.makeText(UsersActivity.this, "Rename successfully.", Toast.LENGTH_SHORT).show();
-                    mUsers = mUserDao.loadAll();
-                    mUserAdapter.notifyDataSetChanged();
-                }else if(name.equals(user.getName())){
-                    Toast.makeText(UsersActivity.this, "Name is not changed.", Toast.LENGTH_SHORT).show();
-                }else if(name.isEmpty()){
-                    Toast.makeText(UsersActivity.this, "New name is missing.", Toast.LENGTH_SHORT).show();
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setView(v);
+            builder.setTitle("Rename User");
+            builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    String name = nameEdit.getText().toString().trim();
+                    if (name != null && !name.isEmpty() && !name.equals(user.getName())) {
+                        user.setName(name);
+                        mUserDao.update(user);
+                        Toast.makeText(UsersActivity.this, "Rename successfully.", Toast.LENGTH_SHORT).show();
+                        mUsers = mUserDao.loadAll();
+                        mUserAdapter.notifyDataSetChanged();
+                    } else if (name.equals(user.getName())) {
+                        Toast.makeText(UsersActivity.this, "Name is not changed.", Toast.LENGTH_SHORT).show();
+                    } else if (name.isEmpty()) {
+                        Toast.makeText(UsersActivity.this, "New name is missing.", Toast.LENGTH_SHORT).show();
+
+                    }
+                }
+            });
+            builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
 
                 }
-            }
-        });
-        builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-
-            }
-        });
-        builder.create().show();
+            });
+            builder.create().show();
+        }
         return true;
     }
 
